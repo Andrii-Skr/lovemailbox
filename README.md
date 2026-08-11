@@ -24,7 +24,7 @@ pnpm dev --hostname 127.0.0.1 --port 3411
 
 ## Production на VPS
 
-Production-конфигурация рассчитана на один Linux VPS с Docker Engine, Docker Compose v2 и Caddy/nginx перед приложением. PostgreSQL доступен только во внутренней Docker-сети, а приложение публикуется на `127.0.0.1:${APP_PORT}`.
+Production-конфигурация рассчитана на один Linux VPS с Docker Engine, Docker Compose v2 и Caddy/nginx перед приложением. PostgreSQL находится во внутренней Docker-сети, а приложение доступно прокси только через внешнюю сеть `EDGE_NETWORK` и не публикует порт на хосте.
 
 ### Первый запуск
 
@@ -40,7 +40,7 @@ make prod-env
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` и `TURNSTILE_SECRET_KEY` — production-ключи Cloudflare Turnstile;
 - `POSTGRES_PASSWORD` — URL-safe пароль, например результат `openssl rand -hex 32`;
 - `IP_HASH_SECRET` — отдельный секрет, также можно использовать `openssl rand -hex 32`;
-- при необходимости измените `APP_PORT`, лимиты памяти и CPU.
+- при необходимости измените `EDGE_NETWORK`, лимиты памяти и CPU.
 
 Файл создаётся с правами `600`. Production-контейнер намеренно не запускается с тестовыми ключами Cloudflare, паролем `change-me` или placeholder для `IP_HASH_SECRET`.
 
@@ -71,13 +71,13 @@ Deploy-скрипт последовательно:
 
 ### Reverse proxy
 
-Направьте Caddy или nginx на `127.0.0.1:3000`. Reverse proxy должен корректно задавать `X-Real-IP`/`X-Forwarded-For`.
+Подключите Caddy или nginx к Docker-сети `EDGE_NETWORK`. Reverse proxy должен корректно задавать `X-Real-IP`/`X-Forwarded-For`.
 
 Пример Caddy:
 
 ```caddy
 love.example.com {
-  reverse_proxy 127.0.0.1:3000
+  reverse_proxy mailbox:3000
 }
 ```
 

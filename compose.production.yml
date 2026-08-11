@@ -19,7 +19,7 @@ x-app-security: &app-security
 
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:17.5-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lovemailbox}
@@ -38,6 +38,7 @@ services:
       retries: 12
       start_period: 10s
     logging: *json-logging
+    stop_grace_period: 1m
 
   migrate:
     image: ${APP_IMAGE:-lovemailbox-app}-migrator:${IMAGE_TAG:-latest}
@@ -68,8 +69,6 @@ services:
         SOURCE_COMMIT: ${SOURCE_COMMIT:-unknown}
     restart: unless-stopped
     stop_grace_period: 30s
-    ports:
-      - "127.0.0.1:${APP_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set the public HTTPS URL in .env.production}
@@ -79,8 +78,10 @@ services:
     volumes:
       - love_mailbox_cache:/app/.next/cache
     networks:
-      - backend
-      - edge
+      backend:
+      edge:
+        aliases:
+          - mailbox
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -91,6 +92,8 @@ services:
     <<: *app-security
     image: ${APP_IMAGE:-lovemailbox-app}:${IMAGE_TAG:-latest}
     command: ["node", "scripts/cleanup.mjs"]
+    healthcheck:
+      disable: true
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
@@ -106,6 +109,8 @@ networks:
   backend:
     internal: true
   edge:
+    external: true
+    name: ${EDGE_NETWORK:-justours-edge}
 
 volumes:
   love_mailbox_db:

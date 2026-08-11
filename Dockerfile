@@ -21,10 +21,13 @@ RUN pnpm prisma generate && pnpm build
 
 FROM base AS migrator
 ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
-COPY package.json pnpm-lock.yaml ./
-COPY prisma ./prisma
-CMD ["pnpm", "prisma", "migrate", "deploy"]
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 migrator
+COPY --from=deps --chown=migrator:nodejs /app/node_modules ./node_modules
+COPY --chown=migrator:nodejs package.json pnpm-lock.yaml ./
+COPY --chown=migrator:nodejs prisma ./prisma
+USER migrator
+RUN ./node_modules/.bin/prisma generate
+CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 
 FROM node:22-alpine AS runner
 WORKDIR /app

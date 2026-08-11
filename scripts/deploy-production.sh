@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$PROJECT_ROOT/compose.production.yml}"
 ENV_FILE="${ENV_FILE:-$PROJECT_ROOT/.env.production}"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_ROOT/backups}"
+EDGE_NETWORK="${EDGE_NETWORK:-}"
 DRY_RUN=0
 CHECK_ONLY=0
 SKIP_BACKUP=0
@@ -34,6 +36,16 @@ fail() {
 
 log() {
   printf '[deploy] %s\n' "$*"
+}
+
+env_value() {
+  local key="$1" value
+  value="$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+  printf '%s' "$value"
 }
 
 print_command() {
@@ -75,6 +87,16 @@ command -v docker >/dev/null 2>&1 || fail "docker is not installed"
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is unavailable"
 [[ -f "$ENV_FILE" ]] || fail "environment file not found: $ENV_FILE (copy .env.production.example first)"
 [[ -f "$COMPOSE_FILE" ]] || fail "Compose file not found: $COMPOSE_FILE"
+chmod 600 "$ENV_FILE"
+
+POSTGRES_PASSWORD_VALUE="$(env_value POSTGRES_PASSWORD)"
+TURNSTILE_SITE_KEY_VALUE="$(env_value NEXT_PUBLIC_TURNSTILE_SITE_KEY)"
+TURNSTILE_SECRET_KEY_VALUE="$(env_value TURNSTILE_SECRET_KEY)"
+IP_HASH_SECRET_VALUE="$(env_value IP_HASH_SECRET)"
+[[ -n "$POSTGRES_PASSWORD_VALUE" && "$POSTGRES_PASSWORD_VALUE" != "change-me" ]] || fail "POSTGRES_PASSWORD is missing or insecure"
+[[ -n "$TURNSTILE_SITE_KEY_VALUE" && "$TURNSTILE_SITE_KEY_VALUE" != "1x00000000000000000000AA" ]] || fail "set a production NEXT_PUBLIC_TURNSTILE_SITE_KEY"
+[[ -n "$TURNSTILE_SECRET_KEY_VALUE" && "$TURNSTILE_SECRET_KEY_VALUE" != "1x0000000000000000000000000000000AA" ]] || fail "set a production TURNSTILE_SECRET_KEY"
+(( ${#IP_HASH_SECRET_VALUE} >= 32 )) || fail "IP_HASH_SECRET must contain at least 32 characters"
 
 SOURCE_COMMIT="$(git -C "$PROJECT_ROOT" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')"
 if [[ -n "$IMAGE_TAG_OVERRIDE" ]]; then
@@ -93,6 +115,20 @@ log "validating Compose configuration"
 if (( CHECK_ONLY == 1 )); then
   log "configuration is valid"
   exit 0
+fi
+
+if [[ -z "$EDGE_NETWORK" ]]; then
+  EDGE_NETWORK="$(env_value EDGE_NETWORK)"
+fi
+EDGE_NETWORK="${EDGE_NETWORK:-justours-edge}"
+[[ "$EDGE_NETWORK" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || fail "invalid EDGE_NETWORK: $EDGE_NETWORK"
+if (( DRY_RUN == 1 )); then
+  print_command docker network inspect "$EDGE_NETWORK"
+else
+  if ! docker network inspect "$EDGE_NETWORK" >/dev/null 2>&1; then
+    log "creating shared edge network: $EDGE_NETWORK"
+    docker network create "$EDGE_NETWORK" >/dev/null
+  fi
 fi
 
 if (( ALLOW_DIRTY == 0 )) && [[ -n "$(git -C "$PROJECT_ROOT" status --porcelain 2>/dev/null)" ]]; then

@@ -36,4 +36,16 @@ describe("TurnstileWidget", () => {
     act(() => scriptState.onReady?.());
     expect(renderWidget).toHaveBeenCalledTimes(2);
   });
+
+  it("resets an issued challenge after a failed verification", () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-key");
+    const resetWidget = vi.fn();
+    window.turnstile = { render: vi.fn().mockReturnValue("widget-1"), remove: vi.fn(), reset: resetWidget };
+
+    const view = render(<TurnstileWidget errorMessage="Unavailable" onToken={() => undefined} resetSignal={0} />);
+    act(() => scriptState.onReady?.());
+    view.rerender(<TurnstileWidget errorMessage="Unavailable" onToken={() => undefined} resetSignal={1} />);
+
+    expect(resetWidget).toHaveBeenCalledWith("widget-1");
+  });
 });

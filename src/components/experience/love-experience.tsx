@@ -17,6 +17,7 @@ type SceneState = "intro" | "ready" | "dropping" | "landed" | "reading" | "final
 type Props = { project: PublicLoveProject; preview?: boolean; demo?: boolean; simulationSignal?: number; resetSignal?: number };
 
 type MotionEventWithPermission = typeof DeviceMotionEvent & { requestPermission?: () => Promise<"granted" | "denied"> };
+const TAP_FALLBACK_DELAY_MS = 8000;
 
 export function LoveExperience({ project, preview = false, demo = false, simulationSignal = 0, resetSignal = 0 }: Props) {
   const dictionary = getDictionary(project.locale);
@@ -27,6 +28,7 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
   const [openedIds, setOpenedIds] = useState<string[]>([]);
   const [current, setCurrent] = useState<LoveLetterInput | null>(null);
   const [reading, setReading] = useState<LoveLetterInput | null>(null);
+  const [tapFallbackAvailable, setTapFallbackAvailable] = useState(false);
   const timers = useRef<number[]>([]);
   const letterDialogRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +52,7 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
 
   const releaseLetter = useCallback(() => {
     if (scene !== "ready" || !nextLetter) return;
+    setTapFallbackAvailable(false);
     setCurrent(nextLetter);
     setScene("dropping");
     const timer = window.setTimeout(() => setScene("landed"), 1150);
@@ -57,6 +60,12 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
   }, [nextLetter, scene]);
 
   useShakeDetection({ enabled: !readOnly && scene === "ready" && motionCapability === "granted", onShake: releaseLetter });
+
+  useEffect(() => {
+    if (readOnly || scene !== "ready" || motionCapability !== "granted" || tapFallbackAvailable) return;
+    const timer = window.setTimeout(() => setTapFallbackAvailable(true), TAP_FALLBACK_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [motionCapability, readOnly, scene, tapFallbackAvailable]);
 
   useEffect(() => {
     if (!preview || simulationSignal <= 0) return;
@@ -112,6 +121,7 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
 
   function openLetter(letter: LoveLetterInput) {
     if (scene !== "landed" && scene !== "ready") return;
+    setTapFallbackAvailable(false);
     setReading(letter);
     setScene("reading");
   }
@@ -147,6 +157,7 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
 
   const openedLetters = letters.filter((letter) => openedIds.includes(letter.id));
   const isFallback = readOnly || motionCapability === "denied" || motionCapability === "unsupported";
+  const mailboxCanRelease = scene === "ready" && (isFallback || tapFallbackAvailable);
   const previewFinalFontSize = Math.max(20, Math.min(32, 37 - project.finalMessage.length * 0.05));
 
   if (scene === "intro") {
@@ -177,7 +188,7 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
         ) : (
           <motion.section key="mailbox" className={`relative mx-auto flex max-w-5xl flex-col items-center justify-end ${preview ? "h-full min-h-0" : "min-h-[calc(100svh-24px)]"}`} initial={preview ? false : { opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="scene-hint animate-hint" role="status">
-              {scene === "landed" ? dictionary.tapLetter : isFallback ? dictionary.tapMailbox : project.shakeHint}
+              {scene === "landed" ? dictionary.tapLetter : isFallback || tapFallbackAvailable ? dictionary.tapMailbox : project.shakeHint}
             </div>
             <MailboxArt
               senderName={project.senderName}
@@ -187,7 +198,7 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
               fallingLetter={scene === "dropping" ? current ?? undefined : undefined}
               shaking={scene === "dropping"}
               empty={scene === "final-delay"}
-              interactive={scene === "ready"}
+              interactive={mailboxCanRelease}
               onMailboxClick={releaseLetter}
               onLetterClick={openLetter}
             />

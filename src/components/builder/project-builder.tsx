@@ -34,6 +34,7 @@ export function ProjectBuilder({ initialProject, defaultProject, editToken, open
   const router = useRouter();
   const [projectMeta, setProjectMeta] = useState(initialProject);
   const [token, setToken] = useState("");
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error" | "conflict">("idle");
   const [message, setMessage] = useState("");
   const [simulationSignal, setSimulationSignal] = useState(0);
@@ -99,6 +100,11 @@ export function ProjectBuilder({ initialProject, defaultProject, editToken, open
   const handleTurnstile = useCallback((value: string) => setToken(value), []);
 
   async function submit(values: ProjectFormValues) {
+    if (!projectMeta && !token) {
+      setStatus("error");
+      setMessage(dictionary.turnstileError);
+      return;
+    }
     setStatus("saving");
     setMessage("");
     const normalized = { ...values, letters: values.letters.map((letter, order) => ({ ...letter, order })) };
@@ -106,6 +112,10 @@ export function ProjectBuilder({ initialProject, defaultProject, editToken, open
       if (!projectMeta) {
         const response = await fetch("/api/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ project: normalized, turnstileToken: token }) });
         const result = await response.json() as { project?: EditableLoveProject; editToken?: string; message?: string };
+        if (response.status === 403) {
+          setToken("");
+          setTurnstileResetSignal((value) => value + 1);
+        }
         if (!response.ok || !result.project || !result.editToken) throw new Error(result.message ?? "Could not create project");
         saveEditToken(result.project.id, result.editToken);
         setStatus("saved");
@@ -187,7 +197,7 @@ export function ProjectBuilder({ initialProject, defaultProject, editToken, open
               <Label htmlFor="final">{dictionary.final}</Label><Textarea id="final" maxLength={600} className="min-h-40" aria-invalid={Boolean(errors.finalMessage)} aria-describedby={errors.finalMessage ? "final-error" : undefined} {...form.register("finalMessage")} /><FieldError id="final-error" message={errors.finalMessage?.message} />
             </section>
 
-            {!projectMeta ? <div className="mt-8"><TurnstileWidget errorMessage={dictionary.turnstileError} onToken={handleTurnstile} /></div> : null}
+            {!projectMeta ? <div className="mt-8"><TurnstileWidget errorMessage={dictionary.turnstileError} onToken={handleTurnstile} resetSignal={turnstileResetSignal} /></div> : null}
             {message ? <p role="status" className={`mt-5 text-sm ${status === "error" || status === "conflict" ? "text-[#a03647]" : "text-[#52704c]"}`}>{message}</p> : null}
             <Button className="mt-7 min-w-44" type="submit" disabled={status === "saving"}><Save className="size-4" />{status === "saving" ? dictionary.saving : dictionary.save}</Button>
           </div>

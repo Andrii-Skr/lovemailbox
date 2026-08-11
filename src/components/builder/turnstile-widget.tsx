@@ -8,11 +8,12 @@ declare global {
     turnstile?: {
       render: (container: HTMLElement, options: { sitekey: string; theme: "light"; callback: (token: string) => void; "expired-callback": () => void }) => string;
       remove: (widgetId: string) => void;
+      reset?: (widgetId: string) => void;
     };
   }
 }
 
-export function TurnstileWidget({ errorMessage, onToken }: { errorMessage: string; onToken: (token: string) => void }) {
+export function TurnstileWidget({ errorMessage, onToken, resetSignal = 0 }: { errorMessage: string; onToken: (token: string) => void; resetSignal?: number }) {
   const container = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -32,6 +33,12 @@ export function TurnstileWidget({ errorMessage, onToken }: { errorMessage: strin
       widgetId.current = null;
     };
   }, [onToken, ready, siteKey]);
+
+  useEffect(() => {
+    if (resetSignal === 0 || !widgetId.current || !window.turnstile?.reset) return;
+    onToken("");
+    window.turnstile.reset(widgetId.current);
+  }, [onToken, resetSignal]);
 
   if (!siteKey) return null;
   return (

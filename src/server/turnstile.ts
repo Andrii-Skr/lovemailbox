@@ -1,5 +1,11 @@
 const ALWAYS_PASS_TEST_SECRET = "1x0000000000000000000000000000000AA";
 
+type TurnstileResult = {
+  success?: boolean;
+  hostname?: string;
+  "error-codes"?: string[];
+};
+
 export async function verifyTurnstile(token: string, ip: string) {
   if (process.env.NODE_ENV !== "production" && process.env.DISABLE_PUBLISH_PROTECTION === "true") return true;
   const secret = process.env.TURNSTILE_SECRET_KEY;
@@ -11,9 +17,17 @@ export async function verifyTurnstile(token: string, ip: string) {
   form.set("remoteip", ip);
   try {
     const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
-    const result = (await response.json()) as { success?: boolean };
+    const result = (await response.json()) as TurnstileResult;
+    if (result.success !== true) {
+      console.warn("[turnstile] verification failed", {
+        errorCodes: result["error-codes"] ?? [],
+        hostname: result.hostname ?? null,
+        tokenPresent: token.length > 0,
+      });
+    }
     return result.success === true;
-  } catch {
+  } catch (error) {
+    console.warn("[turnstile] verification request failed", { message: error instanceof Error ? error.message : "unknown error" });
     return false;
   }
 }
