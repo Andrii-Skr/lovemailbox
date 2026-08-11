@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 declare global {
   interface Window {
     turnstile?: {
-      render: (container: HTMLElement, options: { sitekey: string; theme: "light"; callback: (token: string) => void; "expired-callback": () => void }) => string;
+      render: (container: HTMLElement, options: { sitekey: string; theme: "light"; appearance: "interaction-only"; callback: (token: string) => void; "expired-callback": () => void }) => string;
       remove: (widgetId: string) => void;
       reset?: (widgetId: string) => void;
     };
@@ -25,6 +25,7 @@ export function TurnstileWidget({ errorMessage, onToken, resetSignal = 0 }: { er
     widgetId.current = window.turnstile.render(container.current, {
       sitekey: siteKey,
       theme: "light",
+      appearance: "interaction-only",
       callback: onToken,
       "expired-callback": () => onToken(""),
     });
@@ -49,7 +50,7 @@ export function TurnstileWidget({ errorMessage, onToken, resetSignal = 0 }: { er
         onReady={() => { setLoadFailed(false); setReady(true); }}
         onError={() => { setReady(false); setLoadFailed(true); onToken(""); }}
       />
-      <div ref={container} className="min-h-[65px]" />
+      <div ref={container} />
       {loadFailed ? <p role="alert" className="mt-2 text-sm text-[#a03647]">{errorMessage}</p> : null}
     </>
   );

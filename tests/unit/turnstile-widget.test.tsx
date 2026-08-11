@@ -29,6 +29,10 @@ describe("TurnstileWidget", () => {
     const first = render(<TurnstileWidget errorMessage="Unavailable" onToken={() => undefined} />);
     act(() => scriptState.onReady?.());
     expect(renderWidget).toHaveBeenCalledTimes(1);
+    expect(renderWidget).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ appearance: "interaction-only" }),
+    );
     first.unmount();
     expect(removeWidget).toHaveBeenCalledWith("widget-1");
 
