@@ -2,10 +2,15 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const hour = 60 * 60 * 1000;
+const publishEventRetention = 2 * 24 * hour;
 
 async function cleanup() {
-  const result = await prisma.loveProject.deleteMany({ where: { expiresAt: { lte: new Date() } } });
-  console.log(`[cleanup] removed ${result.count} expired project(s)`);
+  const now = new Date();
+  const [projects, publishEvents] = await Promise.all([
+    prisma.loveProject.deleteMany({ where: { expiresAt: { lte: now } } }),
+    prisma.publishEvent.deleteMany({ where: { createdAt: { lte: new Date(now.getTime() - publishEventRetention) } } }),
+  ]);
+  console.log(`[cleanup] removed ${projects.count} expired project(s) and ${publishEvents.count} old publish event(s)`);
 }
 
 async function run() {

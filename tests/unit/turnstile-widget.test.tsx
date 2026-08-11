@@ -1,0 +1,39 @@
+import { act, cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { TurnstileWidget } from "@/components/builder/turnstile-widget";
+
+const scriptState = vi.hoisted(() => ({ onReady: undefined as (() => void) | undefined }));
+
+vi.mock("next/script", () => ({
+  default: ({ onReady }: { onReady?: () => void }) => {
+    scriptState.onReady = onReady;
+    return null;
+  },
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+  scriptState.onReady = undefined;
+  delete window.turnstile;
+});
+
+describe("TurnstileWidget", () => {
+  it("renders again when Next Script reports an already-loaded script as ready", () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-key");
+    const renderWidget = vi.fn().mockReturnValueOnce("widget-1").mockReturnValueOnce("widget-2");
+    const removeWidget = vi.fn();
+    window.turnstile = { render: renderWidget, remove: removeWidget };
+
+    const first = render(<TurnstileWidget errorMessage="Unavailable" onToken={() => undefined} />);
+    act(() => scriptState.onReady?.());
+    expect(renderWidget).toHaveBeenCalledTimes(1);
+    first.unmount();
+    expect(removeWidget).toHaveBeenCalledWith("widget-1");
+
+    render(<TurnstileWidget errorMessage="Unavailable" onToken={() => undefined} />);
+    act(() => scriptState.onReady?.());
+    expect(renderWidget).toHaveBeenCalledTimes(2);
+  });
+});

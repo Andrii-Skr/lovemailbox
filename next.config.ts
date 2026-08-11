@@ -1,11 +1,25 @@
 import type { NextConfig } from "next";
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
+const productionShowcaseOrigin = "https://justours.love";
+const localShowcaseOrigins = ["http://127.0.0.1:3400", "http://localhost:3400"];
+
+function configuredShowcaseOrigin() {
+  const value = process.env.NEXT_PUBLIC_SHOWCASE_ORIGIN ?? productionShowcaseOrigin;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("NEXT_PUBLIC_SHOWCASE_ORIGIN must be a valid absolute URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("NEXT_PUBLIC_SHOWCASE_ORIGIN must use HTTP or HTTPS");
+  return url.origin;
+}
+
 export default function defineNextConfig(phase: string): NextConfig {
   const isDevelopment = phase === PHASE_DEVELOPMENT_SERVER;
-  const demoFrameAncestors = isDevelopment
-    ? "frame-ancestors http://127.0.0.1:3400 http://localhost:3400"
-    : "frame-ancestors https://justours.love";
+  const frameAncestors = new Set(isDevelopment ? [...localShowcaseOrigins, configuredShowcaseOrigin()] : [configuredShowcaseOrigin()]);
+  const demoFrameAncestors = `frame-ancestors ${Array.from(frameAncestors).join(" ")}`;
 
   return {
     output: "standalone",

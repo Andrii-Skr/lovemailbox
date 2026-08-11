@@ -5,7 +5,13 @@ import { useEffect } from "react";
 const LOCAL_SHOWCASE_ORIGINS = new Set(["http://127.0.0.1:3400", "http://localhost:3400"]);
 
 function showcaseOrigin() {
-  if (process.env.NEXT_PUBLIC_SHOWCASE_ORIGIN) return process.env.NEXT_PUBLIC_SHOWCASE_ORIGIN;
+  if (process.env.NEXT_PUBLIC_SHOWCASE_ORIGIN) {
+    try {
+      return new URL(process.env.NEXT_PUBLIC_SHOWCASE_ORIGIN).origin;
+    } catch {
+      return "https://justours.love";
+    }
+  }
   if (process.env.NODE_ENV !== "development") return "https://justours.love";
   try {
     const referrerOrigin = new URL(document.referrer).origin;

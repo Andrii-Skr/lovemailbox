@@ -12,10 +12,11 @@ declare global {
   }
 }
 
-export function TurnstileWidget({ onToken }: { onToken: (token: string) => void }) {
+export function TurnstileWidget({ errorMessage, onToken }: { errorMessage: string; onToken: (token: string) => void }) {
   const container = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   useEffect(() => {
@@ -35,8 +36,14 @@ export function TurnstileWidget({ onToken }: { onToken: (token: string) => void 
   if (!siteKey) return null;
   return (
     <>
-      <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onLoad={() => setReady(true)} />
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+        strategy="afterInteractive"
+        onReady={() => { setLoadFailed(false); setReady(true); }}
+        onError={() => { setReady(false); setLoadFailed(true); onToken(""); }}
+      />
       <div ref={container} className="min-h-[65px]" />
+      {loadFailed ? <p role="alert" className="mt-2 text-sm text-[#a03647]">{errorMessage}</p> : null}
     </>
   );
 }

@@ -68,7 +68,7 @@ export function MailboxArt(props: Props) {
             </div>
           ) : null}
           <NamePair className="mailbox-label" layout="stacked" senderName={props.senderName} recipientName={props.recipientName} />
-          <button className="mailbox-button" type="button" onClick={props.onMailboxClick} disabled={!props.interactive} aria-label="Mailbox" />
+          <button data-mailbox-focus className="mailbox-button" type="button" onClick={props.onMailboxClick} disabled={!props.interactive} aria-label="Mailbox" />
         </motion.div>
       </div>
 

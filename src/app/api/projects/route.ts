@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
   }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return NextResponse.json({ message: "Validation failed" }, { status: 422 });
+  }
   const raw = body as { project?: unknown; turnstileToken?: unknown };
   const parsed = projectSchema.safeParse(raw.project);
   if (!parsed.success) return NextResponse.json({ message: "Validation failed", issues: parsed.error.flatten() }, { status: 422 });

@@ -1,0 +1,112 @@
+name: ${COMPOSE_PROJECT_NAME:-lovemailbox}
+
+x-json-logging: &json-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app-security: &app-security
+  init: true
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  logging: *json-logging
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lovemailbox}
+      POSTGRES_USER: ${POSTGRES_USER:-lovemailbox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - love_mailbox_db:/var/lib/postgresql/data
+    networks:
+      - backend
+    shm_size: 256mb
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-768m}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lovemailbox} -d ${POSTGRES_DB:-lovemailbox}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging: *json-logging
+
+  migrate:
+    image: ${APP_IMAGE:-lovemailbox-app}-migrator:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      target: migrator
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: "no"
+    logging: *json-logging
+
+  app:
+    <<: *app-security
+    image: ${APP_IMAGE:-lovemailbox-app}:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      target: runner
+      args:
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?Set a production Turnstile site key in .env.production}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set the public HTTPS URL in .env.production}
+        NEXT_PUBLIC_SHOWCASE_ORIGIN: ${NEXT_PUBLIC_SHOWCASE_ORIGIN:-https://justours.love}
+        APP_VERSION: ${IMAGE_TAG:-latest}
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-unknown}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set the public HTTPS URL in .env.production}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?Set a production Turnstile site key in .env.production}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?Set a production Turnstile secret key in .env.production}
+      IP_HASH_SECRET: ${IP_HASH_SECRET:?Set a random IP hash secret in .env.production}
+    volumes:
+      - love_mailbox_cache:/app/.next/cache
+    networks:
+      - backend
+      - edge
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    mem_limit: ${APP_MEMORY_LIMIT:-512m}
+    cpus: ${APP_CPUS:-1.0}
+
+  cleanup:
+    <<: *app-security
+    image: ${APP_IMAGE:-lovemailbox-app}:${IMAGE_TAG:-latest}
+    command: ["node", "scripts/cleanup.mjs"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+    networks:
+      - backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    mem_limit: 256m
+    cpus: 0.25
+
+networks:
+  backend:
+    internal: true
+  edge:
+
+volumes:
+  love_mailbox_db:
+  love_mailbox_cache:

@@ -1,45 +1,77 @@
 import { z } from "zod";
+import type { ProjectLocale } from "@/lib/types";
 
-const trimmed = (label: string, min: number, max: number) =>
-  z.string().trim().min(min, `${label}: минимум ${min}`).max(max, `${label}: максимум ${max}`);
+const validationCopy = {
+  ru: {
+    labels: { letter: "Письмо", title: "Название", sender: "Имя отправителя", recipient: "Имя получателя", intro: "Вступление", button: "Текст кнопки", hint: "Подсказка", final: "Финальное сообщение" },
+    min: (label: string, value: number) => `${label}: минимум ${value}`,
+    max: (label: string, value: number) => `${label}: максимум ${value}`,
+    enabled: "Включите хотя бы одно письмо",
+    order: "Порядок писем должен быть уникальным",
+  },
+  uk: {
+    labels: { letter: "Лист", title: "Назва", sender: "Ім’я відправника", recipient: "Ім’я отримувача", intro: "Вступ", button: "Текст кнопки", hint: "Підказка", final: "Фінальне повідомлення" },
+    min: (label: string, value: number) => `${label}: мінімум ${value}`,
+    max: (label: string, value: number) => `${label}: максимум ${value}`,
+    enabled: "Увімкніть хоча б один лист",
+    order: "Порядок листів має бути унікальним",
+  },
+  en: {
+    labels: { letter: "Letter", title: "Title", sender: "Sender name", recipient: "Recipient name", intro: "Introduction", button: "Button text", hint: "Hint", final: "Final message" },
+    min: (label: string, value: number) => `${label}: minimum ${value}`,
+    max: (label: string, value: number) => `${label}: maximum ${value}`,
+    enabled: "Enable at least one letter",
+    order: "Letter order must be unique",
+  },
+} as const;
 
-export const letterSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string().trim().max(80).optional(),
-  message: trimmed("Письмо", 1, 1200),
-  order: z.number().int().min(0).max(29),
-  enabled: z.boolean(),
-});
+function createLocalizedSchemas(locale: ProjectLocale) {
+  const copy = validationCopy[locale];
+  const trimmed = (label: string, min: number, max: number) =>
+    z.string().trim().min(min, copy.min(label, min)).max(max, copy.max(label, max));
+  const letter = z.object({
+    id: z.string().uuid(),
+    title: z.string().trim().max(80, copy.max(copy.labels.title, 80)).optional(),
+    message: trimmed(copy.labels.letter, 1, 1200),
+    order: z.number().int().min(0).max(29),
+    enabled: z.boolean(),
+  });
 
-export const projectSchema = z
-  .object({
-    locale: z.enum(["ru", "uk", "en"]),
-    title: trimmed("Название", 1, 80),
-    senderName: trimmed("Имя отправителя", 1, 60),
-    recipientName: trimmed("Имя получателя", 1, 60),
-    introText: trimmed("Вступление", 2, 280),
-    buttonText: trimmed("Текст кнопки", 1, 40),
-    shakeHint: trimmed("Подсказка", 2, 80),
-    finalMessage: trimmed("Финальное сообщение", 2, 600),
-    letters: z.array(letterSchema).min(1).max(30),
+  return z.object({
+    locale: z.literal(locale),
+    title: trimmed(copy.labels.title, 1, 80),
+    senderName: trimmed(copy.labels.sender, 1, 60),
+    recipientName: trimmed(copy.labels.recipient, 1, 60),
+    introText: trimmed(copy.labels.intro, 2, 280),
+    buttonText: trimmed(copy.labels.button, 1, 40),
+    shakeHint: trimmed(copy.labels.hint, 2, 80),
+    finalMessage: trimmed(copy.labels.final, 2, 600),
+    letters: z.array(letter).min(1).max(30),
   })
   .superRefine((data, context) => {
     if (!data.letters.some((letter) => letter.enabled)) {
-      context.addIssue({
-        code: "custom",
-        path: ["letters"],
-        message: "Включите хотя бы одно письмо",
-      });
+      context.addIssue({ code: "custom", path: ["letters"], message: copy.enabled });
     }
     const orders = new Set(data.letters.map((letter) => letter.order));
     if (orders.size !== data.letters.length) {
-      context.addIssue({ code: "custom", path: ["letters"], message: "Порядок писем должен быть уникальным" });
+      context.addIssue({ code: "custom", path: ["letters"], message: copy.order });
     }
   });
+}
 
-export const patchProjectSchema = projectSchema.safeExtend({
-  updatedAt: z.string().datetime(),
-});
+const localizedProjectSchemas = {
+  ru: createLocalizedSchemas("ru"),
+  uk: createLocalizedSchemas("uk"),
+  en: createLocalizedSchemas("en"),
+};
+
+export const projectSchema = z.discriminatedUnion("locale", [localizedProjectSchemas.ru, localizedProjectSchemas.uk, localizedProjectSchemas.en]);
+
+export const patchProjectSchema = z.discriminatedUnion("locale", [
+  localizedProjectSchemas.ru.safeExtend({ updatedAt: z.string().datetime() }),
+  localizedProjectSchemas.uk.safeExtend({ updatedAt: z.string().datetime() }),
+  localizedProjectSchemas.en.safeExtend({ updatedAt: z.string().datetime() }),
+]);
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
 

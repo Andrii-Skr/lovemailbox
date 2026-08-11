@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lovemailbox}
       POSTGRES_USER: ${POSTGRES_USER:-lovemailbox}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - love_mailbox_db:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
       context: .
       target: migrator
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
     depends_on:
       db:
         condition: service_healthy
@@ -32,16 +32,18 @@ services:
       context: .
       target: runner
       args:
-        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?Set a production Turnstile site key in .env}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set the public HTTPS URL in .env}
+        NEXT_PUBLIC_SHOWCASE_ORIGIN: ${NEXT_PUBLIC_SHOWCASE_ORIGIN:-https://justours.love}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
-      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
-      IP_HASH_SECRET: ${IP_HASH_SECRET:-replace-with-at-least-32-random-characters}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set the public HTTPS URL in .env}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?Set a production Turnstile site key in .env}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?Set a production Turnstile secret key in .env}
+      IP_HASH_SECRET: ${IP_HASH_SECRET:?Set a random IP hash secret in .env}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -56,11 +58,13 @@ services:
       context: .
       target: runner
       args:
-        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?Set a production Turnstile site key in .env}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set the public HTTPS URL in .env}
+        NEXT_PUBLIC_SHOWCASE_ORIGIN: ${NEXT_PUBLIC_SHOWCASE_ORIGIN:-https://justours.love}
     command: ["node", "scripts/cleanup.mjs"]
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
     depends_on:
       migrate:
         condition: service_completed_successfully

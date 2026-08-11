@@ -22,13 +22,56 @@ pnpm dev
 pnpm dev --hostname 127.0.0.1 --port 3411
 ```
 
-## VPS
+## Production на VPS
 
-1. Скопируйте `.env.example` в `.env` и задайте сильные `POSTGRES_PASSWORD` и `IP_HASH_SECRET`.
-2. Укажите HTTPS-адрес в `NEXT_PUBLIC_SITE_URL`.
-3. Создайте Cloudflare Turnstile widget для своего домена и замените site/secret keys.
-4. Запустите `docker compose up -d --build`.
-5. Направьте Caddy или nginx на `127.0.0.1:3000`. Reverse proxy должен корректно задавать `X-Real-IP`/`X-Forwarded-For`.
+Production-конфигурация рассчитана на один Linux VPS с Docker Engine, Docker Compose v2 и Caddy/nginx перед приложением. PostgreSQL доступен только во внутренней Docker-сети, а приложение публикуется на `127.0.0.1:${APP_PORT}`.
+
+### Первый запуск
+
+```bash
+git clone git@github.com:Andrii-Skr/lovemailbox.git
+cd lovemailbox
+make prod-env
+```
+
+Заполните `.env.production`:
+
+- `NEXT_PUBLIC_SITE_URL` — публичный HTTPS-адрес без завершающего `/`;
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` и `TURNSTILE_SECRET_KEY` — production-ключи Cloudflare Turnstile;
+- `POSTGRES_PASSWORD` — URL-safe пароль, например результат `openssl rand -hex 32`;
+- `IP_HASH_SECRET` — отдельный секрет, также можно использовать `openssl rand -hex 32`;
+- при необходимости измените `APP_PORT`, лимиты памяти и CPU.
+
+Файл создаётся с правами `600`. Production-контейнер намеренно не запускается с тестовыми ключами Cloudflare, паролем `change-me` или placeholder для `IP_HASH_SECRET`.
+
+Проверьте конфигурацию и план деплоя:
+
+```bash
+make prod-config
+make deploy-dry-run
+```
+
+После этого выполните deployment:
+
+```bash
+make deploy
+```
+
+Deploy-скрипт последовательно:
+
+1. проверяет Compose и чистоту Git worktree;
+2. собирает versioned app/migrator images;
+3. запускает и дожидается PostgreSQL;
+4. сохраняет backup в `backups/`;
+5. применяет Prisma migrations;
+6. пересоздаёт app и cleanup;
+7. ждёт `/api/healthz`, показывает итоговое состояние и сохраняет активный image tag в `.release` для следующих operational-команд.
+
+При осознанном деплое незакоммиченного дерева используйте `make deploy-dirty`. Backup можно отключить прямым вызовом `scripts/deploy-production.sh --skip-backup`, но для обычного production deployment это не рекомендуется.
+
+### Reverse proxy
+
+Направьте Caddy или nginx на `127.0.0.1:3000`. Reverse proxy должен корректно задавать `X-Real-IP`/`X-Forwarded-For`.
 
 Пример Caddy:
 
@@ -38,7 +81,22 @@ love.example.com {
 }
 ```
 
-PostgreSQL хранится в Docker volume. Миграции выполняются одноразовым сервисом `migrate`, а `cleanup` каждый час удаляет проекты старше семи дней.
+PostgreSQL и Next.js image cache хранятся в отдельных Docker volumes. Миграции выполняются одноразовым сервисом `migrate`, а `cleanup` каждый час удаляет просроченные проекты. `make prod-down` не удаляет volumes.
+
+### Обновление и операции
+
+```bash
+git pull --ff-only
+make release-check
+make deploy
+
+make prod-ps
+make prod-logs
+make prod-restart
+make prod-migrate
+```
+
+Список всех команд доступен через `make help`.
 
 ## Проверки
 
@@ -49,3 +107,5 @@ pnpm test
 pnpm build
 pnpm e2e
 ```
+
+`pnpm e2e` сам собирает и поднимает production-сервер на `127.0.0.1:3107`, поэтому его можно запускать параллельно с обычным `pnpm dev`. Для проверки уже запущенного стенда задайте `E2E_BASE_URL`.

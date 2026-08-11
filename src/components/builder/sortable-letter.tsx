@@ -52,8 +52,8 @@ export function SortableLetter({ fieldId, index, register, errors, dictionary, o
         </div>
         <div>
           <Label htmlFor={`letter-${index}-message`}>{dictionary.letterMessage}</Label>
-          <Textarea id={`letter-${index}-message`} maxLength={1200} {...register(`letters.${index}.message`)} />
-          {error?.message?.message ? <p className="mt-2 text-xs text-[#a03647]">{error.message.message}</p> : null}
+          <Textarea id={`letter-${index}-message`} maxLength={1200} aria-invalid={Boolean(error?.message)} aria-describedby={error?.message ? `letter-${index}-message-error` : undefined} {...register(`letters.${index}.message`)} />
+          {error?.message?.message ? <p id={`letter-${index}-message-error`} role="alert" className="mt-2 text-xs text-[#a03647]">{error.message.message}</p> : null}
         </div>
       </div>
     </div>

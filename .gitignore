@@ -2,6 +2,10 @@ node_modules
 .next
 .env
 .env.local
+.env.production
+backups
+.deploy.lock
+.release
 coverage
 playwright-report
 test-results

@@ -7,6 +7,8 @@ import { MailboxArt } from "@/components/experience/mailbox-art";
 import { NamePair } from "@/components/experience/name-pair";
 import { Button } from "@/components/ui/button";
 import { useShakeDetection } from "@/hooks/use-shake-detection";
+import { useDocumentLanguage } from "@/hooks/use-document-language";
+import { useModalFocus } from "@/hooks/use-modal-focus";
 import { clearProgress, loadProgress, saveProgress } from "@/lib/progress";
 import { getDictionary } from "@/lib/i18n";
 import type { LoveLetterInput, MotionCapability, PublicLoveProject } from "@/lib/types";
@@ -26,6 +28,9 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
   const [current, setCurrent] = useState<LoveLetterInput | null>(null);
   const [reading, setReading] = useState<LoveLetterInput | null>(null);
   const timers = useRef<number[]>([]);
+  const letterDialogRef = useRef<HTMLDivElement>(null);
+
+  useDocumentLanguage(project.locale, !preview);
 
   const clearTimers = useCallback(() => {
     timers.current.forEach((timer) => window.clearTimeout(timer));
@@ -138,13 +143,15 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
     setScene(preview ? "ready" : "intro");
   }
 
+  useModalFocus(scene === "reading", letterDialogRef, closeLetter, { fallbackFocusSelector: "[data-mailbox-focus]" });
+
   const openedLetters = letters.filter((letter) => openedIds.includes(letter.id));
   const isFallback = readOnly || motionCapability === "denied" || motionCapability === "unsupported";
   const previewFinalFontSize = Math.max(20, Math.min(32, 37 - project.finalMessage.length * 0.05));
 
   if (scene === "intro") {
     return (
-      <main className="sunset-scene paper-grain flex min-h-[100svh] items-center justify-center px-6 py-[max(32px,env(safe-area-inset-top))] text-center">
+      <main lang={project.locale} className="sunset-scene paper-grain flex min-h-[100svh] items-center justify-center px-6 py-[max(32px,env(safe-area-inset-top))] text-center">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .8 }} className="relative z-10 mx-auto max-w-3xl">
           <motion.div className="intro-envelope mx-auto" initial={{ rotate: -9, scale: .85 }} animate={{ rotate: -4, scale: 1 }} transition={{ type: "spring", delay: .15 }} />
           <NamePair className="mt-9 text-[10px] font-extrabold uppercase tracking-[.22em] text-[#74453e]" heartClassName="text-[var(--wine)]" senderName={project.senderName} recipientName={project.recipientName} />
@@ -156,7 +163,7 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
   }
 
   return (
-    <main className={`sunset-scene paper-grain relative overflow-hidden ${preview ? "phone-preview h-full min-h-0 pt-3" : "min-h-[100svh] pt-[max(18px,env(safe-area-inset-top))]"}`}>
+    <main lang={project.locale} className={`sunset-scene paper-grain relative overflow-hidden ${preview ? "phone-preview h-full min-h-0 pt-3" : "min-h-[100svh] pt-[max(18px,env(safe-area-inset-top))]"}`}>
       <AnimatePresence mode="wait">
         {scene === "complete" ? (
           <motion.section key="complete" className="final-scene absolute inset-0 z-40 grid place-items-center px-6 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}>
@@ -180,7 +187,7 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
               fallingLetter={scene === "dropping" ? current ?? undefined : undefined}
               shaking={scene === "dropping"}
               empty={scene === "final-delay"}
-              interactive={scene === "ready" && isFallback}
+              interactive={scene === "ready"}
               onMailboxClick={releaseLetter}
               onLetterClick={openLetter}
             />
@@ -198,9 +205,9 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
           ><span className="font-display text-lg italic text-[var(--wine)]">{project.recipientName}</span></motion.button>
         ) : null}
         {scene === "reading" && reading ? (
-          <motion.div className="letter-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="letter-title" onClick={closeLetter}>
+          <motion.div ref={letterDialogRef} tabIndex={-1} className="letter-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="letter-title" onClick={closeLetter}>
             <motion.article className="letter-paper" initial={{ y: 80, rotate: -2, scale: .88 }} animate={{ y: 0, rotate: 0, scale: 1 }} exit={{ y: 50, scale: .94 }} transition={{ type: "spring", damping: 22 }} onClick={(event) => event.stopPropagation()}>
-              <button type="button" className="absolute right-4 top-4 z-10 grid size-11 place-items-center rounded-full text-[var(--muted)] hover:bg-black/5" onClick={closeLetter} aria-label={dictionary.close}><X className="size-5" /></button>
+              <button data-modal-initial-focus type="button" className="absolute right-4 top-4 z-10 grid size-11 place-items-center rounded-full text-[var(--muted)] hover:bg-black/5" onClick={closeLetter} aria-label={dictionary.close}><X className="size-5" /></button>
               <NamePair className="text-[10px] font-extrabold uppercase tracking-[.2em] text-[var(--rose)]" heartClassName="text-[var(--wine)]" senderName={project.senderName} recipientName={project.recipientName} />
               <h2 id="letter-title" className="font-display mt-5 text-4xl font-semibold leading-tight">{reading.title || project.recipientName}</h2>
               <p className="font-display mt-6 whitespace-pre-line text-[clamp(1.35rem,4vw,1.8rem)] leading-[1.45] text-[#574039]">{reading.message}</p>

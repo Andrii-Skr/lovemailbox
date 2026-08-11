@@ -94,6 +94,11 @@ button { cursor: pointer; }
 @keyframes float-hint { 0%,100% { transform: translate(-50%,0); } 50% { transform: translate(-50%,-8px); } }
 .animate-hint { animation: float-hint 2.2s ease-in-out infinite; }
 
+@keyframes share-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes share-dialog-in { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.share-backdrop { animation: share-backdrop-in .2s ease-out both; }
+.share-dialog { animation: share-dialog-in .3s cubic-bezier(.2,.8,.2,1) both; }
+
 @media (max-width: 640px) {
   .mailbox-stage { width: min(112vw, 530px); min-height: 390px; height: min(65svh, 540px); margin-left: -6vw; }
   .mailbox-label { font-size: clamp(15px, 4.2vw, 19px); }
