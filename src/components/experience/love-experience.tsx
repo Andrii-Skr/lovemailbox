@@ -200,11 +200,11 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
         {scene === "reading" && reading ? (
           <motion.div ref={letterDialogRef} tabIndex={-1} className="letter-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="letter-title" onClick={closeLetter}>
             <motion.article className="letter-paper" initial={{ y: 80, rotate: -2, scale: .88 }} animate={{ y: 0, rotate: 0, scale: 1 }} exit={{ y: 50, scale: .94 }} transition={{ type: "spring", damping: 22 }} onClick={(event) => event.stopPropagation()}>
-              <button data-modal-initial-focus type="button" className="absolute right-4 top-4 z-10 grid size-11 place-items-center rounded-full text-[var(--muted)] hover:bg-black/5" onClick={closeLetter} aria-label={dictionary.close}><X className="size-5" /></button>
-              <NamePair className="text-[10px] font-extrabold uppercase tracking-[.2em] text-[var(--rose)]" heartClassName="text-[var(--wine)]" senderName={project.senderName} recipientName={project.recipientName} />
-              <h2 id="letter-title" className="font-display mt-5 text-4xl font-semibold leading-tight">{reading.title || project.recipientName}</h2>
-              <p className="font-display mt-6 whitespace-pre-line text-[clamp(1.35rem,4vw,1.8rem)] leading-[1.45] text-[#574039]">{reading.message}</p>
-              <Button variant="outline" className="mt-9" onClick={closeLetter}>{dictionary.close}</Button>
+              <button data-modal-initial-focus type="button" className="letter-close absolute right-4 top-4 z-10 grid size-11 place-items-center rounded-full text-[var(--muted)]" onClick={closeLetter} aria-label={dictionary.close}><X className="size-5" /></button>
+              <NamePair className="letter-byline text-[10px] font-extrabold uppercase tracking-[.2em] text-[var(--rose)]" heartClassName="text-[var(--wine)]" senderName={project.senderName} recipientName={project.recipientName} />
+              <h2 id="letter-title" className="letter-title font-display mt-5 text-4xl font-semibold leading-tight">{reading.title || project.recipientName}</h2>
+              <p className="letter-message font-display mt-6 whitespace-pre-line text-[clamp(1.35rem,4vw,1.8rem)] leading-[1.45] text-[#574039]">{reading.message}</p>
+              <Button variant="outline" className="letter-close-action mx-auto mt-9 flex min-w-44" onClick={closeLetter}>{dictionary.close}</Button>
             </motion.article>
           </motion.div>
         ) : null}
