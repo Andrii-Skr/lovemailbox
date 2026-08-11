@@ -6,6 +6,7 @@ import { getDemoProject } from "@/lib/demo-project";
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  localStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -39,5 +40,21 @@ describe("LoveExperience", () => {
 
     expect(screen.getByRole("button", { name: "Mailbox" })).toBeEnabled();
     expect(screen.getByRole("status")).toHaveTextContent("Tap the mailbox");
+  });
+
+  it("starts from the beginning even when an earlier visit saved progress", () => {
+    const project = { ...getDemoProject("en"), id: "fresh-visit-project" };
+    localStorage.setItem(
+      "love-progress:v1:fresh-visit-project",
+      JSON.stringify({ openedLetterIds: project.letters.map((letter) => letter.id), completed: true }),
+    );
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Desktop");
+
+    render(<LoveExperience project={project} />);
+    fireEvent.click(screen.getByRole("button", { name: "Take a look" }));
+
+    expect(screen.getByRole("button", { name: "Mailbox" })).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Tap the mailbox");
+    expect(screen.queryByText(project.finalMessage)).not.toBeInTheDocument();
   });
 });

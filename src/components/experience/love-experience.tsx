@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { useShakeDetection } from "@/hooks/use-shake-detection";
 import { useDocumentLanguage } from "@/hooks/use-document-language";
 import { useModalFocus } from "@/hooks/use-modal-focus";
-import { clearProgress, loadProgress, saveProgress } from "@/lib/progress";
 import { getDictionary } from "@/lib/i18n";
 import type { LoveLetterInput, MotionCapability, PublicLoveProject } from "@/lib/types";
 
@@ -40,13 +39,6 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
   }, []);
 
   useEffect(() => clearTimers, [clearTimers]);
-
-  useEffect(() => {
-    if (readOnly) return;
-    const progress = loadProgress(project.id, letters.map((letter) => letter.id));
-    const timer = window.setTimeout(() => setOpenedIds(progress.openedLetterIds), 0);
-    return () => window.clearTimeout(timer);
-  }, [letters, project.id, readOnly]);
 
   const nextLetter = letters.find((letter) => !openedIds.includes(letter.id));
 
@@ -86,14 +78,6 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
   }, [clearTimers, preview, resetSignal]);
 
   async function enterScene() {
-    const validIds = letters.map((letter) => letter.id);
-    const progress = readOnly ? { openedLetterIds: [], completed: false } : loadProgress(project.id, validIds);
-    setOpenedIds(progress.openedLetterIds);
-    if (progress.completed) {
-      setScene("complete");
-      return;
-    }
-
     if (demo) {
       setMotionCapability("unsupported");
       setScene("ready");
@@ -131,7 +115,6 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
     const wasCurrent = current?.id === reading.id;
     const nextOpened = openedIds.includes(reading.id) ? openedIds : [...openedIds, reading.id];
     setOpenedIds(nextOpened);
-    if (!readOnly) saveProgress(project.id, { openedLetterIds: nextOpened, completed: nextOpened.length === letters.length });
     setReading(null);
     if (wasCurrent) setCurrent(null);
 
@@ -146,7 +129,6 @@ export function LoveExperience({ project, preview = false, demo = false, simulat
 
   function restart() {
     clearTimers();
-    if (!readOnly) clearProgress(project.id);
     setOpenedIds([]);
     setCurrent(null);
     setReading(null);
