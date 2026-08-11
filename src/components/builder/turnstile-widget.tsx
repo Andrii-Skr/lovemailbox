@@ -1,0 +1,42 @@
+"use client";
+
+import Script from "next/script";
+import { useEffect, useRef, useState } from "react";
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: { sitekey: string; theme: "light"; callback: (token: string) => void; "expired-callback": () => void }) => string;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
+export function TurnstileWidget({ onToken }: { onToken: (token: string) => void }) {
+  const container = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  useEffect(() => {
+    if (!ready || !siteKey || !container.current || !window.turnstile || widgetId.current) return;
+    widgetId.current = window.turnstile.render(container.current, {
+      sitekey: siteKey,
+      theme: "light",
+      callback: onToken,
+      "expired-callback": () => onToken(""),
+    });
+    return () => {
+      if (widgetId.current && window.turnstile) window.turnstile.remove(widgetId.current);
+      widgetId.current = null;
+    };
+  }, [onToken, ready, siteKey]);
+
+  if (!siteKey) return null;
+  return (
+    <>
+      <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onLoad={() => setReady(true)} />
+      <div ref={container} className="min-h-[65px]" />
+    </>
+  );
+}

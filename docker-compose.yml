@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lovemailbox}
+      POSTGRES_USER: ${POSTGRES_USER:-lovemailbox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - love_mailbox_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lovemailbox} -d ${POSTGRES_DB:-lovemailbox}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    build:
+      context: .
+      target: migrator
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runner
+      args:
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
+      IP_HASH_SECRET: ${IP_HASH_SECRET:-replace-with-at-least-32-random-characters}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  cleanup:
+    build:
+      context: .
+      target: runner
+      args:
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+    command: ["node", "scripts/cleanup.mjs"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lovemailbox}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-lovemailbox}?schema=public
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  love_mailbox_db:

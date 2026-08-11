@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectLocale {
+  ru
+  uk
+  en
+}
+
+model LoveProject {
+  id            String        @id @default(uuid()) @db.Uuid
+  slug          String        @unique @db.VarChar(48)
+  editTokenHash String        @map("edit_token_hash") @db.Char(64)
+  locale        ProjectLocale @default(ru)
+  title         String        @db.VarChar(80)
+  senderName    String        @map("sender_name") @db.VarChar(60)
+  recipientName String        @map("recipient_name") @db.VarChar(60)
+  introText     String        @map("intro_text") @db.VarChar(280)
+  buttonText    String        @map("button_text") @db.VarChar(40)
+  shakeHint     String        @map("shake_hint") @db.VarChar(80)
+  finalMessage  String        @map("final_message") @db.VarChar(600)
+  expiresAt     DateTime      @map("expires_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  letters       LoveLetter[]
+
+  @@index([expiresAt])
+  @@map("love_projects")
+}
+
+model LoveLetter {
+  id        String      @id @default(uuid()) @db.Uuid
+  projectId String      @map("project_id") @db.Uuid
+  title     String?     @db.VarChar(80)
+  message   String      @db.VarChar(1200)
+  order     Int
+  enabled   Boolean     @default(true)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  project   LoveProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, order])
+  @@index([projectId, enabled, order])
+  @@map("love_letters")
+}
+
+model PublishEvent {
+  id        BigInt   @id @default(autoincrement())
+  ipHash    String   @map("ip_hash") @db.Char(64)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ipHash, createdAt(sort: Desc)])
+  @@map("publish_events")
+}
